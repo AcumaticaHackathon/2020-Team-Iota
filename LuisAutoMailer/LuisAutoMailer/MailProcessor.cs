@@ -36,14 +36,13 @@ namespace LuisAutoMailer
             PXTrace.WriteInformation("Processing email package. ");
 
             var account = package.Account;
-
-            var accountExt = account.GetExtension<SMEMailAccountExt>();
+            var accountExt = account.GetExtension<PX.SM.EMailAccountExt>();
 
             //Checkin if Incoming Processing is active & SO Processing
             if (account.IncomingProcessing != true ||
-                accountExt.UsrSOProcessing != true)
+                accountExt.UsrCustomMailer != true)
             {
-                PXTrace.WriteInformation("IncomingProcessing: " + account.IncomingProcessing + ", SOProcessing: " + accountExt.UsrSOProcessing + ". ");
+                PXTrace.WriteInformation("IncomingProcessing: " + account.IncomingProcessing + ", SOProcessing: " + accountExt.UsrCustomMailer + ". ");
                 return false;
             }
 
@@ -65,7 +64,7 @@ namespace LuisAutoMailer
                 PXTrace.WriteInformation("Start Processing of email: " + message.Subject + "");
 
                 //Create BuildersPO Graph
-                BuildersPOSOEntry buildersGraph = PXGraph.CreateInstance<BuildersPOSOEntry>();
+                MailerSOGraph buildersGraph = PXGraph.CreateInstance<MailerSOGraph>();
 
                 //Get File Attachment
                 UploadFile file = SelectFrom<UploadFile>.
@@ -80,7 +79,7 @@ namespace LuisAutoMailer
 
                     PXTrace.WriteInformation("Calling SO Import function");
 
-                    buildersGraph.ImportStatement(attachment, message.Subject, false);
+                  //  buildersGraph.ImportStatement(attachment, message.Subject, false);
                     return true;
                 }
                 else
