@@ -3,15 +3,19 @@ using System.Collections;
 using System.Collections.Generic;
 using PX.SM;
 using PX.Data;
+using System.Linq;
+using PX.Objects.AR;
 using PX.Objects.SO;
 using PX.Objects.CR;
 using PX.Objects.IN;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace LuisAutoMailer
 {
     public class MailerSOGraph : PXGraph<MailerSOGraph>
     {
-        private void GenerateSalesOrders(object JsonPackage)
+        public void GenerateSalesOrders(string JsonPackage, string mailFrom, DateTime orderDate)
         {
             try
             {
@@ -22,12 +26,16 @@ namespace LuisAutoMailer
 
                 #region Variables
 
+                JObject package = JObject.Parse(JsonPackage);
+                
                 int countLines = 0;
+                decimal qty = 0.0M;
 
                 //Customer
-                BAccount customer = PXSelect<BAccount,
-                                Where<BAccount.acctCD, Equal<BAccount.acctCD>>>>.
-                                Select(soGraph, graphOrderEntry.Order.Current.SiteCode);
+                Customer customer = PXSelect<Customer,
+                                Where<Customer.acctCD, Equal<Customer.acctCD>>>.
+                                Select(soGraph, "ABCHOLDING");
+
 
                 //Customer Default Location
                 Location arCustomerLocation = PXSelect<Location,
@@ -35,12 +43,7 @@ namespace LuisAutoMailer
                                                   And<Location.bAccountID, Equal<Required<Location.bAccountID>>,
                                                   And<Location.locationCD, Equal<Required<Location.locationCD>>>>>>.
                                               Select(soGraph, true, customer.BAccountID, "MAIN");
-
-                //Warehouse
-                INSite warehouse = PXSelect<INSite,
-                                   Where<INSite.siteCD, Equal<Required<INSite.siteCD>>>>.
-                                   Select(soGraph, PnPSetup.Current.Warehouse); //[DIST-TRU-CT]
-
+                
                 PXTrace.WriteInformation("SO Order Graph variables set.");
                 #endregion
 
@@ -56,9 +59,9 @@ namespace LuisAutoMailer
 
                     soGraph.Document.Cache.SetValueExt<SOOrder.customerID>(order, customer.BAccountID);
                     soGraph.Document.Cache.SetValueExt<SOOrder.customerLocationID>(order, arCustomerLocation.LocationID);
-                    soGraph.Document.Cache.SetValueExt<SOOrder.customerOrderNbr>(order, graphOrderEntry.Order.Current.PONumber);
+                    soGraph.Document.Cache.SetValueExt<SOOrder.customerOrderNbr>(order, "");
                     soGraph.Document.Cache.SetValueExt<SOOrder.orderDate>(order, DateTime.Now);
-                    soGraph.Document.Cache.SetValueExt<SOOrder.requestDate>(order, graphOrderEntry.Order.Current.DeliveryDate);
+                    soGraph.Document.Cache.SetValueExt<SOOrder.requestDate>(order, orderDate);
 
                     //Update Order
                     order = soGraph.Document.Update(order);
@@ -73,113 +76,97 @@ namespace LuisAutoMailer
                 if (hasError == false)
                 {
                     PXTrace.WriteInformation("SO Order Header added. Starting rows. ");
-                    decimal ediTotal = 0M;
 
                     //Details
-                    foreach (PPOrderLine ediOrderLine in graphOrderEntry.OrderLine.Select())
+
+                    SuperJSon superJSon = JsonConvert.DeserializeObject<SuperJSon>(package.ToString());
+                    List<string> inventorydesc = new List<string>();
+                    int Myqty = 0;
+                    foreach (var item in superJSon.compositeEntities)
                     {
-                        decimal qty = 0M;
-
-                        //Get Inventory ID
-                        InventoryItem inItem = PXSelectReadonly2<InventoryItem,
-                                                InnerJoin<INItemXRef, On<InventoryItem.inventoryID, Equal<INItemXRef.inventoryID>>,
-                                                InnerJoin<BAccount, On<BAccount.bAccountID, Equal<INItemXRef.bAccountID>>>>,
-                                                Where<INItemXRef.alternateID, Equal<Required<INItemXRef.alternateID>>>>.
-                                                Select(soGraph, ediOrderLine.ArticleNumber, PnPSetup.Current.PnPCustomerID);
-
-                        if (inItem != null)
+                        if (item.children[0].type == "product")
                         {
-                            try
-                            {
-                                SOLine orderLine = soGraph.Transactions.Insert();
-
-                                soGraph.Transactions.Cache.SetValueExt<SOLine.inventoryID>(orderLine, inItem.InventoryID);
-                                soGraph.Transactions.Cache.SetValueExt<SOLine.siteID>(orderLine, warehouse.SiteID);
-
-                                if (inItem.SalesUnit == "EACH")
-                                {
-                                    qty = Convert.ToDecimal(ediOrderLine.RequestedQuantity) * Convert.ToDecimal(ediOrderLine.PackSize);
-                                }
-                                else
-                                {
-                                    qty = Convert.ToDecimal(ediOrderLine.RequestedQuantity);
-                                }
-                                soGraph.Transactions.Cache.SetValueExt<SOLine.orderQty>(orderLine, qty);
-
-                                //Update Item
-                                soGraph.Transactions.Cache.SetValueExt<SOLineExt.usrpnpPrice>(orderLine, ediOrderLine.NetPrice / 1.15M);
-                                orderLine = soGraph.Transactions.Update(orderLine);
-
-                                ediTotal = ediTotal + Convert.ToDecimal(ediOrderLine.NetPrice) / 1.15M;
-
-                                ediOrderLine.TrxStatus = "P";                                                           //Processed
-                                countLines++;
-                            }
-                            catch (Exception er)
-                            {
-                                if (er.Message.Length >= 100)
-                                {
-                                    ediOrderLine.TrxMessage = er.Message.Substring(0, 100);
-                                }
-                                else
-                                {
-                                    ediOrderLine.TrxMessage = er.Message;
-                                }
-
-                                ediOrderLine.TrxStatus = "F";                                                           //Failed
-                                hasError = true;
-                            }
+                            inventorydesc.Add(item.children[0].value);
                         }
                         else
                         {
-                            PXTrace.WriteInformation("SO Order detail, " +
-                                                    ediOrderLine.ArticleNumber +
-                                                    " could not be found in inventory. ");
-
-                            log.TrxLog += "ERROR ***Item " + ediOrderLine.ArticleNumber + " does not exist ***";
-                            ediOrderLine.TrxMessage = "Item(s) does not exist.";
-                            ediOrderLine.TrxStatus = "F";                                                               //Failed
+                            Myqty = Convert.ToInt32(item.children[0].value);
                         }
-
-                        //Update EDI Orderline 
-                        this.OrderLine.Update(ediOrderLine);
                     }
 
-                    PXTrace.WriteInformation("SO Order Details added. ");
+                    //    JObject saleLine = JObject.Parse(sl);
 
-                    if (hasError == false)
+                    var inItem = new PXSelect<InventoryItem>(this).Select().AsQueryable();
+
+                    foreach (string item in inventorydesc)
                     {
-                        //Sales Order
-                        soGraph.Document.Cache.SetValueExt<SOOrderExt.usrEDITotal>(order, ediTotal);
+                        inItem = inItem.Where(i => i.GetItem<InventoryItem>().Descr.Contains(item));
+                    }
 
-                        order = soGraph.Document.Update(order);
+                    InventoryItem ResultInventory = inItem.First();
+
+
+                    INSite warehouse = PXSelectReadonly<INSite,
+                                          Where<INSite.siteCD, Equal<Required<INSite.siteCD>>>>.
+                                          Select(soGraph, "WHOLESALE");
+
+
+                    if (inItem != null)
+                    {
                         try
                         {
-                            soGraph.Actions.PressSave();
+                            SOLine orderLine = soGraph.Transactions.Insert();
 
-                            log.TrxLog += "Order [" + soGraph.Document.Current.RefNbr + "] created. ";
-                            PXTrace.WriteInformation("Updated & Saved SO Order. ");
+                            soGraph.Transactions.Cache.SetValueExt<SOLine.inventoryID>(orderLine, ResultInventory.InventoryID);
+                            soGraph.Transactions.Cache.SetValueExt<SOLine.siteID>(orderLine, warehouse.SiteID);
+
+                            qty = Convert.ToDecimal(Myqty);
+
+                            soGraph.Transactions.Cache.SetValueExt<SOLine.orderQty>(orderLine, qty);
+
+                            orderLine = soGraph.Transactions.Update(orderLine);
+
+                            countLines++;
                         }
-                        catch (PXException pEx)
+                        catch (Exception)
                         {
-                            PXTrace.WriteInformation(pEx.Message + " " + pEx.InnerException);
+                            hasError = true;  //Failed
                         }
                     }
                     else
                     {
-                        PXTrace.WriteInformation("Errors on order, could not save. ");
+                        hasError = true;  //Failed
+                    }
+                }
+
+                PXTrace.WriteInformation("SO Order Details added. ");
+
+                if (hasError == false)
+                {
+                   //ADD EMAIL
+
+
+                    order = soGraph.Document.Update(order);
+                    try
+                    {
+                        soGraph.Actions.PressSave();
+                        PXTrace.WriteInformation("Order [" + soGraph.Document.Current.RefNbr + "] created ");
+                    }
+                    catch (PXException pEx)
+                    {
+                        PXTrace.WriteInformation(pEx.Message + " " + pEx.InnerException);
                     }
                 }
                 else
                 {
-                    PXTrace.WriteInformation(ms);
+                    PXTrace.WriteInformation("Errors on order, could not save. ");
                 }
+            
             }
             catch (Exception e)
             {
                 PXTrace.WriteInformation(e.Message);
             }
-            return log;
         }
 
         //Internal View

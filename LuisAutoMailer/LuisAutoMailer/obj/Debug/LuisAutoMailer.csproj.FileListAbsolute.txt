@@ -16,3 +16,6 @@ C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\bin\Debug\System.Net.Http
 C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\obj\Debug\LuisAutoMailer.csproj.CopyComplete
 C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\obj\Debug\LuisAutoMailer.dll
 C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\obj\Debug\LuisAutoMailer.pdb
+C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\bin\Debug\LuisAutoMailer.dll.config
+C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\bin\Debug\HtmlAgilityPack.dll
+C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\bin\Debug\HtmlAgilityPack.xml
