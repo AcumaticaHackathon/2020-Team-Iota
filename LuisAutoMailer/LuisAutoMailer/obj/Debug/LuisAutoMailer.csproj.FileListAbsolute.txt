@@ -1,0 +1,2 @@
+C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\obj\Debug\LuisAutoMailer.csprojAssemblyReference.cache
+C:\Github\2020-Team-Iota\LuisAutoMailer\LuisAutoMailer\obj\Debug\LuisAutoMailer.csproj.CoreCompileInputs.cache
