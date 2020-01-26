@@ -31,7 +31,7 @@ namespace LuisAutoMailer
                 }
                 catch (Exception ex)
                 {
-                    throw new PX.Data.PXException( ex.Message);
+                    throw new PX.Data.PXException(ex.Message);
                 }
             }
 

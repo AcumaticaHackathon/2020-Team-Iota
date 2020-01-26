@@ -22,10 +22,10 @@ namespace LuisAutoMailer
                 .ActivateOnApplicationStart<MailProcessor>(builder, PX.Objects.EP.EmailProcessorManager.Register);
         }
     }
-       
+
 
     public class MailProcessor : BasicEmailProcessor
-    {       
+    {
         public MailProcessor()
         {
             PXTrace.WriteInformation("Sales Order mail Processor instantiated. ");
@@ -57,9 +57,12 @@ namespace LuisAutoMailer
                 PXTrace.WriteInformation("IsIncome: " + message.IsIncome + ", RefNoteID: " + message.RefNoteID + ". ");
                 return false;
             }
+
+
             LuisAPI predictionEngine = PXGraph.CreateInstance<LuisAPI>();
             var myTask = predictionEngine.GetPrediction(package.Message.Body);
             string result;
+
             try
             {
                 result = myTask.Result;
@@ -68,41 +71,11 @@ namespace LuisAutoMailer
             {
                 throw new PXException(ex.Message);
             }
-            if (message.Subject.Contains("Massbuild") && message.Subject.Contains("Order Number"))
-            {
 
-                PXTrace.WriteInformation("Start Processing of email: " + message.Subject + "");
+            //Create BuildersPO Graph
+            MailerSOGraph soGrapt = PXGraph.CreateInstance<MailerSOGraph>();
 
-                //Create BuildersPO Graph
-                MailerSOGraph buildersGraph = PXGraph.CreateInstance<MailerSOGraph>();
 
-                //Get File Attachment
-                UploadFile file = SelectFrom<UploadFile>.
-                                  InnerJoin<NoteDoc>.On<UploadFile.fileID.IsEqual<NoteDoc.fileID>>.SingleTableOnly.
-                                  Where<NoteDoc.noteID.IsEqual<@P.AsGuid>
-                                        .And<UploadFile.name.IsLike<@P.AsString>>>.View.Select(package.Graph, message.NoteID, "%.csv%");
-
-                if (file != null)
-                {
-                    var fm = PXGraph.CreateInstance<UploadFileMaintenance>();
-                    PX.SM.FileInfo attachment = fm.GetFile(new Guid(file.FileID.ToString()));
-
-                    PXTrace.WriteInformation("Calling SO Import function");
-
-                  //  buildersGraph.ImportStatement(attachment, message.Subject, false);
-                    return true;
-                }
-                else
-                {
-                    PXTrace.WriteInformation("Message Attachment could not be retrieved: " + message.Subject + "");
-                    return false;
-                }
-            }
-            else
-            {
-                PXTrace.WriteInformation("Message Subject validation could not pick up keys: " + message.Subject + "");
-                return false;
-            }
         }
     }
 }
