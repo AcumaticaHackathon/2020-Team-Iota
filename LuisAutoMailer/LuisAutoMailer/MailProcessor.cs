@@ -11,6 +11,7 @@ using PX.Objects.EP;
 using PX.Data;
 using PX.Data.BQL;
 using PX.Data.BQL.Fluent;
+using HtmlAgilityPack;
 
 namespace LuisAutoMailer
 {
@@ -58,9 +59,9 @@ namespace LuisAutoMailer
                 return false;
             }
 
-
+            string mailBody = HtmlRemoval.StripTagsRegexCompiled(package.Message.Body);
             LuisAPI predictionEngine = PXGraph.CreateInstance<LuisAPI>();
-            var myTask = predictionEngine.GetPrediction(package.Message.Body);
+            var myTask = predictionEngine.PostPrediction (mailBody);
             string result;
 
             try
@@ -73,9 +74,16 @@ namespace LuisAutoMailer
             }
 
             //Create BuildersPO Graph
-            MailerSOGraph soGrapt = PXGraph.CreateInstance<MailerSOGraph>();
 
+            //Get File Attachment
+            UploadFile file = SelectFrom<UploadFile>.
+                              InnerJoin<NoteDoc>.On<UploadFile.fileID.IsEqual<NoteDoc.fileID>>.SingleTableOnly.
+                              Where<UploadFile.noteID.IsEqual<@P.AsGuid>>.View.Select(package.Graph, message.NoteID);
+            
+            MailerSOGraph soGraph = PXGraph.CreateInstance<MailerSOGraph>();
+            soGraph.GenerateSalesOrders(result, package.Message.MailFrom, Convert.ToDateTime(package.Message.CreatedDateTime));
 
+            return true;
         }
     }
 }
