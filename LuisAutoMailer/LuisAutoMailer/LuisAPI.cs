@@ -4,10 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Net.Http;
+using PX.Data;
 
 namespace LuisAutoMailer
 {
-    class LuisAPI
+    public class LuisAPI : PXGraph<LuisAPI>
     {
         public async Task<string> GetPrediction(string querystring)
         {

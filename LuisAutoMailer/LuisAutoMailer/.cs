@@ -57,7 +57,17 @@ namespace LuisAutoMailer
                 PXTrace.WriteInformation("IsIncome: " + message.IsIncome + ", RefNoteID: " + message.RefNoteID + ". ");
                 return false;
             }
-
+            LuisAPI predictionEngine = PXGraph.CreateInstance<LuisAPI>();
+            var myTask = predictionEngine.GetPrediction(package.Message.Body);
+            string result;
+            try
+            {
+                result = myTask.Result;
+            }
+            catch (Exception ex)
+            {
+                throw new PXException(ex.Message);
+            }
             if (message.Subject.Contains("Massbuild") && message.Subject.Contains("Order Number"))
             {
 
